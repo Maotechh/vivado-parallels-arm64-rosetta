@@ -68,6 +68,7 @@ set -euo pipefail
 source "$VIVADO_ROOT/settings64.sh"
 export PATH="$HOME/.local/xilinx-x86_64-tools:\$PATH"
 export LD_LIBRARY_PATH="$HOME/.local/xilinx-x86_64-libs:\${LD_LIBRARY_PATH:-}"
+unset GIO_LAUNCHED_DESKTOP_FILE GIO_LAUNCHED_DESKTOP_FILE_PID
 exec "$VIVADO_ROOT/bin/vivado" "\$@"
 EOF
 chmod +x "$HOME/.local/bin/vivado"
@@ -81,7 +82,7 @@ Version=1.0
 Type=Application
 Name=Vivado $VERSION
 Comment=AMD Vivado Design Suite
-Exec=$HOME/.local/bin/vivado
+Exec=$HOME/.local/bin/vivado -mode gui
 Icon=$icon
 Terminal=false
 Categories=Development;Electronics;

@@ -139,6 +139,10 @@ uname -m -> x86_64
 
 All other `uname` calls still go to `/usr/bin/uname`.
 
+### Desktop Launch Quirk
+
+GNOME/GIO desktop launch can inject `GIO_LAUNCHED_DESKTOP_FILE` and `GIO_LAUNCHED_DESKTOP_FILE_PID`. In this ARM64/Rosetta setup, Vivado GUI could launch from a terminal but crash when started through a `.desktop` entry until those variables were cleared. The generated `~/.local/bin/vivado` wrapper unsets them before executing Vivado.
+
 ### XSim Compiler/Linker Shims
 
 The failure mode was XSim using ARM host compiler/linker components while elaborating an x86_64 simulator snapshot. The fix is:
