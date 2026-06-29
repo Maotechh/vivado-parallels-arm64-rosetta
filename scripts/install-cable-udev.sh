@@ -1,8 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${VERSION:=2023.1}"
-: "${VIVADO_ROOT:=$HOME/Xilinx/$VERSION/Vivado}"
+: "${VERSION:=}"
+
+if [ -z "${VIVADO_ROOT:-}" ]; then
+  if [ -z "$VERSION" ]; then
+    echo "Set VERSION or VIVADO_ROOT before running install-cable-udev.sh directly." >&2
+    exit 1
+  fi
+  VIVADO_ROOT="$HOME/Xilinx/$VERSION/Vivado"
+fi
 
 rules_dir="$VIVADO_ROOT/data/xicom/cable_drivers/lin64/install_script/install_drivers"
 if [ ! -d "$rules_dir" ]; then

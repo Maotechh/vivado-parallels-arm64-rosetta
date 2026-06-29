@@ -5,21 +5,21 @@ This repo documents and scripts a verified Vivado installation flow for:
 - Apple Silicon Mac
 - Parallels Desktop Ubuntu ARM64 VM
 - Rosetta Linux x86_64 emulation
-- AMD Vivado 2023.1
+- AMD Vivado for Linux (x86_64)
 
 The goal is to make the repeatable part one-command:
 
 ```bash
-./install.sh --installer ~/Downloads/*2023.1*Lin64*.bin --smoke
+./install.sh --version <version> --installer ~/Downloads/*<version>*Lin64*.bin --smoke
 ```
 
 AMD account login, export-control checks, license terms, and the installer download cannot be redistributed or bypassed. Download the official Linux Unified Installer from AMD first, then run this repo's script.
 
 ## Verified Result
 
-This repo targets Vivado 2023.1. The Rosetta/binfmt, x86_64 compiler shim, udev, and smoke-test workflow was developed on Ubuntu 24.04.4 ARM64 under Parallels Desktop; run the included smoke tests after installing 2023.1 to validate your machine.
+This repo is version-parameterized. The Rosetta/binfmt, x86_64 compiler shim, udev, and smoke-test workflow was tested on Ubuntu 24.04.4 ARM64 under Parallels Desktop with Vivado 2026.1. Run the included smoke tests after installing your target Vivado version to validate your machine.
 
-- Vivado install root defaults to `~/Xilinx/2023.1/Vivado`.
+- Vivado install root defaults to `~/Xilinx/<version>/Vivado`.
 - Vivado GUI launches through Rosetta.
 - BASIC license was detected by Vivado.
 - XSim behavioral simulation passed with `SMOKE_SIM_PASS`.
@@ -54,19 +54,19 @@ This repo handles those points.
 ```bash
 git clone https://github.com/Maotechh/vivado-parallels-arm64-rosetta.git
 cd vivado-parallels-arm64-rosetta
-./install.sh --installer ~/Downloads/*2023.1*Lin64*.bin --smoke
+./install.sh --version <version> --installer ~/Downloads/*<version>*Lin64*.bin --smoke
 ```
 
 If Vivado is already installed:
 
 ```bash
-./install.sh --skip-installer --smoke
+./install.sh --version <version> --skip-installer --smoke
 ```
 
 If the board is plugged in and assigned to the VM:
 
 ```bash
-./install.sh --skip-installer --smoke --hardware-detect
+./install.sh --version <version> --skip-installer --smoke --hardware-detect
 ```
 
 To program a safe JTAG test bitstream:
@@ -209,7 +209,7 @@ The scripts and documentation in this repo are released under the MIT License. A
 
 These are the concrete actions that led to the verified setup:
 
-1. Installed Vivado under `~/Xilinx/<version>/Vivado`; the repo default is now `2023.1`.
+1. Installed Vivado under `~/Xilinx/<version>/Vivado`; the fully tested session used Vivado 2026.1.
 2. Confirmed the Vivado BASIC license was detected.
 3. Switched x86_64 execution from QEMU to Parallels Rosetta by masking `qemu-x86_64`.
 4. Installed `amd64` runtime libraries and x86_64 cross compilers.

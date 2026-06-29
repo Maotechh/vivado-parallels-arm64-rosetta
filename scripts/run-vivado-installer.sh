@@ -3,14 +3,26 @@ set -euo pipefail
 
 : "${INSTALLER:=}"
 : "${XILINX_ROOT:=$HOME/Xilinx}"
-: "${VIVADO_ROOT:=$XILINX_ROOT/2023.1/Vivado}"
+: "${VERSION:=}"
+
+if [ -z "$VERSION" ] && [ -n "$INSTALLER" ]; then
+  VERSION="$(printf '%s\n' "$INSTALLER" | grep -Eo '[0-9]{4}\.[0-9]+' | head -n 1 || true)"
+fi
+
+if [ -z "${VIVADO_ROOT:-}" ]; then
+  if [ -z "$VERSION" ]; then
+    echo "Unable to infer Vivado version from installer path. Pass --version <version>." >&2
+    exit 1
+  fi
+  VIVADO_ROOT="$XILINX_ROOT/$VERSION/Vivado"
+fi
 
 if [ -z "$INSTALLER" ]; then
   cat >&2 <<EOF
 No installer was provided.
 
 Download the Linux Unified Installer from AMD/Xilinx, then rerun:
-  ./install.sh --installer /path/to/*<version>*Lin64*.bin
+  ./install.sh --version <version> --installer /path/to/*<version>*Lin64*.bin
 
 AMD login, export controls, and EULA acceptance cannot be automated or redistributed here.
 EOF

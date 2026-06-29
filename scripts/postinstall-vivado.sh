@@ -1,9 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${VERSION:=2023.1}"
-: "${VIVADO_ROOT:=$HOME/Xilinx/$VERSION/Vivado}"
+: "${VERSION:=}"
 : "${INSTALL_SYSTEM_SHIMS:=1}"
+
+if [ -z "${VIVADO_ROOT:-}" ]; then
+  if [ -z "$VERSION" ]; then
+    echo "Set VERSION or VIVADO_ROOT before running postinstall-vivado.sh directly." >&2
+    exit 1
+  fi
+  VIVADO_ROOT="$HOME/Xilinx/$VERSION/Vivado"
+fi
+
+if [ -z "$VERSION" ]; then
+  VERSION="$(printf '%s\n' "$VIVADO_ROOT" | grep -Eo '[0-9]{4}\.[0-9]+' | head -n 1 || true)"
+fi
+if [ -z "$VERSION" ]; then
+  VERSION="custom"
+fi
 
 if [ ! -f "$VIVADO_ROOT/settings64.sh" ] || [ ! -x "$VIVADO_ROOT/bin/vivado" ]; then
   echo "Vivado installation was not found at: $VIVADO_ROOT" >&2

@@ -9,7 +9,7 @@ Usage:
   ./install.sh [options]
 
 Options:
-  --version VERSION        Vivado version, default: 2023.1
+  --version VERSION        Vivado version; required unless inferable from installer or --vivado-root
   --xilinx-root DIR        Xilinx install root, default: $HOME/Xilinx
   --vivado-root DIR        Vivado root, default: $XILINX_ROOT/$VERSION/Vivado
   --installer FILE         Already-downloaded AMD/Xilinx Linux Unified Installer
@@ -21,13 +21,13 @@ Options:
   --help                   Show this help
 
 Examples:
-  ./install.sh --installer ~/Downloads/*2023.1*Lin64*.bin --smoke
-  ./install.sh --skip-installer --smoke --hardware-detect
+  ./install.sh --version <version> --installer ~/Downloads/*<version>*Lin64*.bin --smoke
+  ./install.sh --version <version> --skip-installer --smoke --hardware-detect
   ./install.sh --postinstall-only --no-system-shims
 EOF
 }
 
-VERSION="${VERSION:-2023.1}"
+VERSION="${VERSION:-}"
 XILINX_ROOT="${XILINX_ROOT:-$HOME/Xilinx}"
 VIVADO_ROOT="${VIVADO_ROOT:-}"
 INSTALLER="${INSTALLER:-}"
@@ -88,8 +88,30 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
+infer_version_from_path() {
+  local value="$1"
+  local inferred=""
+  inferred="$(printf '%s\n' "$value" | grep -Eo '[0-9]{4}\.[0-9]+' | head -n 1 || true)"
+  printf '%s\n' "$inferred"
+}
+
 if [ -z "$VIVADO_ROOT" ]; then
+  if [ -z "$VERSION" ] && [ -n "$INSTALLER" ]; then
+    VERSION="$(infer_version_from_path "$INSTALLER")"
+  fi
   VIVADO_ROOT="$XILINX_ROOT/$VERSION/Vivado"
+fi
+
+if [ -z "$VERSION" ]; then
+  VERSION="$(infer_version_from_path "$VIVADO_ROOT")"
+fi
+
+if [ -z "$VERSION" ]; then
+  cat >&2 <<'EOF'
+Unable to infer Vivado version.
+Pass --version <version>, or pass --vivado-root /path/to/<version>/Vivado.
+EOF
+  exit 1
 fi
 
 export VERSION XILINX_ROOT VIVADO_ROOT INSTALLER INSTALL_SYSTEM_SHIMS
