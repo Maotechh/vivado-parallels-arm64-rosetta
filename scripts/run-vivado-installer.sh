@@ -2,6 +2,8 @@
 set -euo pipefail
 
 : "${INSTALLER:=}"
+: "${INSTALL_CONFIG:=}"
+: "${ACCEPT_EULAS:=0}"
 : "${XILINX_ROOT:=$HOME/Xilinx}"
 : "${VERSION:=}"
 
@@ -17,6 +19,18 @@ if [ -z "${VIVADO_ROOT:-}" ]; then
   VIVADO_ROOT="$XILINX_ROOT/$VERSION/Vivado"
 fi
 
+detect_installed_vivado_root() {
+  local candidate
+  for candidate in "$VIVADO_ROOT" "$XILINX_ROOT/$VERSION/Vivado" "$XILINX_ROOT/Vivado/$VERSION"; do
+    [ -n "$candidate" ] || continue
+    if [ -x "$candidate/bin/vivado" ]; then
+      VIVADO_ROOT="$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
 if [ -z "$INSTALLER" ]; then
   cat >&2 <<EOF
 No installer was provided.
@@ -29,28 +43,121 @@ EOF
   exit 1
 fi
 
-if [ ! -f "$INSTALLER" ]; then
+if [ ! -f "$INSTALLER" ] && [ ! -d "$INSTALLER" ]; then
   echo "Installer not found: $INSTALLER" >&2
   exit 1
 fi
 
-chmod +x "$INSTALLER"
+if [ -n "$INSTALL_CONFIG" ] && [ ! -f "$INSTALL_CONFIG" ]; then
+  echo "Install config not found: $INSTALL_CONFIG" >&2
+  exit 1
+fi
+
+if [ -n "$INSTALL_CONFIG" ] && [ "$ACCEPT_EULAS" != "1" ]; then
+  cat >&2 <<EOF
+Batch install with --install-config requires explicit --accept-eulas.
+This passes xsetup: -a XilinxEULA,3rdPartyEULA
+EOF
+  exit 1
+fi
+
 mkdir -p "$XILINX_ROOT"
 
 cat <<EOF
-Launching Vivado installer:
+Preparing Vivado installer:
   $INSTALLER
 
 Install location should be:
   $XILINX_ROOT
 
-After the installer exits, this script will continue with wrappers, compiler shims, and udev rules.
+After xsetup exits, this script will continue with wrappers, compiler shims, and udev rules.
 EOF
 
-"$INSTALLER"
+cleanup_paths=()
+cleanup() {
+  local path
+  for path in "${cleanup_paths[@]}"; do
+    rm -rf "$path"
+  done
+}
+trap cleanup EXIT
+
+make_fake_uname() {
+  local fakebin="$1"
+  mkdir -p "$fakebin"
+  cat > "$fakebin/uname" <<'EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = "-m" ]; then
+  echo x86_64
+else
+  exec /usr/bin/uname "$@"
+fi
+EOF
+  chmod +x "$fakebin/uname"
+}
+
+resolve_xsetup_dir() {
+  local installer="$1"
+  local extract_dir
+
+  if [ -d "$installer" ]; then
+    if [ -x "$installer/xsetup" ]; then
+      printf '%s\n' "$installer"
+      return 0
+    fi
+    echo "Installer directory does not contain executable xsetup: $installer" >&2
+    return 1
+  fi
+
+  chmod +x "$installer"
+  extract_dir="$(mktemp -d "${TMPDIR:-/tmp}/vivado-xsetup-${VERSION:-unknown}.XXXXXX")"
+  cleanup_paths+=("$extract_dir")
+
+  echo "Extracting installer to: $extract_dir" >&2
+  set +e
+  bash "$installer" --noexec --target "$extract_dir" >&2
+  local extract_status=$?
+  set -e
+
+  if [ ! -x "$extract_dir/xsetup" ]; then
+    echo "xsetup was not found after extraction." >&2
+    if [ "$extract_status" -ne 0 ]; then
+      exit "$extract_status"
+    fi
+    exit 1
+  fi
+
+  if [ "$extract_status" -ne 0 ]; then
+    echo "Installer extraction returned $extract_status, but xsetup exists; continuing." >&2
+  fi
+
+  printf '%s\n' "$extract_dir"
+}
+
+xsetup_dir="$(resolve_xsetup_dir "$INSTALLER")"
+fakebin="$(mktemp -d "${TMPDIR:-/tmp}/vivado-fakeuname.XXXXXX")"
+cleanup_paths+=("$fakebin")
+make_fake_uname "$fakebin"
+
+if [ -n "$INSTALL_CONFIG" ]; then
+  echo "Running xsetup batch install with config: $INSTALL_CONFIG"
+  PATH="$fakebin:$PATH" "$xsetup_dir/xsetup" -a XilinxEULA,3rdPartyEULA -b Install -c "$INSTALL_CONFIG"
+else
+  cat <<EOF
+Launching xsetup GUI.
+
+On ARM64 Parallels Linux, this wrapper makes xsetup see uname -m as x86_64
+so the x86_64 installer can run under Rosetta.
+EOF
+  PATH="$fakebin:$PATH" "$xsetup_dir/xsetup"
+fi
+
+detect_installed_vivado_root || true
 
 if [ ! -x "$VIVADO_ROOT/bin/vivado" ]; then
   echo "Vivado executable was not found at $VIVADO_ROOT/bin/vivado after installer exit." >&2
-  echo "If you used a different install path, rerun with --vivado-root /actual/path/Vivado." >&2
+  echo "If you used a different install path, rerun with --vivado-root /actual/path/to/Vivado." >&2
   exit 1
 fi
+
+echo "Vivado executable found at $VIVADO_ROOT/bin/vivado"

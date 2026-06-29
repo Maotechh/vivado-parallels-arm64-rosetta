@@ -35,6 +35,11 @@ sudo apt-get install -y --no-install-recommends \
   libxinerama1:amd64 \
   libxss1:amd64 \
   libxft2:amd64 \
+  libusb-0.1-4:amd64 \
+  libusb-1.0-0:amd64 \
+  libftdi1:amd64 \
+  libftdi1-2:amd64 \
+  usbutils \
   "$gtk_pkg"
 
 echo "Dependencies installed."

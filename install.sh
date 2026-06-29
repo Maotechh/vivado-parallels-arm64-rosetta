@@ -13,6 +13,8 @@ Options:
   --xilinx-root DIR        Xilinx install root, default: $HOME/Xilinx
   --vivado-root DIR        Vivado root, default: $XILINX_ROOT/$VERSION/Vivado
   --installer FILE         Already-downloaded AMD/Xilinx Linux Unified Installer
+  --install-config FILE    Run xsetup in batch mode with this generated config file
+  --accept-eulas           Required with --install-config; accepts Xilinx and 3rd-party EULAs
   --skip-installer         Do not run the installer, only prepare and postinstall
   --postinstall-only       Only create wrappers, shims, udev rules, and optional smoke test
   --no-system-shims        Do not replace /usr/bin/gcc, /usr/bin/g++, /usr/bin/ld wrappers
@@ -22,6 +24,7 @@ Options:
 
 Examples:
   ./install.sh --version <version> --installer ~/Downloads/*<version>*Lin64*.bin --smoke
+  ./install.sh --version <version> --installer ~/Downloads/*<version>*Lin64*.bin --install-config install_config.txt --accept-eulas --smoke
   ./install.sh --version <version> --skip-installer --smoke --hardware-detect
   ./install.sh --postinstall-only --no-system-shims
 EOF
@@ -31,6 +34,8 @@ VERSION="${VERSION:-}"
 XILINX_ROOT="${XILINX_ROOT:-$HOME/Xilinx}"
 VIVADO_ROOT="${VIVADO_ROOT:-}"
 INSTALLER="${INSTALLER:-}"
+INSTALL_CONFIG="${INSTALL_CONFIG:-}"
+ACCEPT_EULAS="${ACCEPT_EULAS:-0}"
 SKIP_INSTALLER=0
 POSTINSTALL_ONLY=0
 INSTALL_SYSTEM_SHIMS="${INSTALL_SYSTEM_SHIMS:-1}"
@@ -54,6 +59,14 @@ while [ "$#" -gt 0 ]; do
     --installer)
       INSTALLER="$2"
       shift 2
+      ;;
+    --install-config)
+      INSTALL_CONFIG="$2"
+      shift 2
+      ;;
+    --accept-eulas)
+      ACCEPT_EULAS=1
+      shift
       ;;
     --skip-installer)
       SKIP_INSTALLER=1
@@ -95,6 +108,19 @@ infer_version_from_path() {
   printf '%s\n' "$inferred"
 }
 
+detect_installed_vivado_root() {
+  local candidate
+  for candidate in "$VIVADO_ROOT" "$XILINX_ROOT/$VERSION/Vivado" "$XILINX_ROOT/Vivado/$VERSION"; do
+    [ -n "$candidate" ] || continue
+    if [ -x "$candidate/bin/vivado" ]; then
+      VIVADO_ROOT="$candidate"
+      export VIVADO_ROOT
+      return 0
+    fi
+  done
+  return 1
+}
+
 if [ -z "$VIVADO_ROOT" ]; then
   if [ -z "$VERSION" ] && [ -n "$INSTALLER" ]; then
     VERSION="$(infer_version_from_path "$INSTALLER")"
@@ -114,7 +140,7 @@ EOF
   exit 1
 fi
 
-export VERSION XILINX_ROOT VIVADO_ROOT INSTALLER INSTALL_SYSTEM_SHIMS
+export VERSION XILINX_ROOT VIVADO_ROOT INSTALLER INSTALL_CONFIG ACCEPT_EULAS INSTALL_SYSTEM_SHIMS
 
 "$repo_dir/scripts/check-env.sh"
 
@@ -123,11 +149,14 @@ if [ "$POSTINSTALL_ONLY" -eq 0 ]; then
   "$repo_dir/scripts/install-deps.sh"
 fi
 
+detect_installed_vivado_root || true
+
 if [ "$SKIP_INSTALLER" -eq 0 ]; then
   if [ -x "$VIVADO_ROOT/bin/vivado" ]; then
     echo "Vivado already exists at $VIVADO_ROOT; skipping installer."
   else
     "$repo_dir/scripts/run-vivado-installer.sh"
+    detect_installed_vivado_root || true
   fi
 fi
 

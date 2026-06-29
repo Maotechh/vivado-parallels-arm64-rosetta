@@ -43,7 +43,6 @@ mark "project_create"
 
 set_property top tb_led_counter [get_filesets sim_1]
 launch_simulation -simset sim_1 -mode behavioral
-run all
 close_sim
 mark "behavioral_sim"
 

@@ -2,6 +2,10 @@ puts "SMOKE_VERSION [version -short]"
 open_hw_manager
 connect_hw_server -url localhost:3121
 puts "SMOKE_STEP_PASS connect_hw_server"
+if {[catch {refresh_hw_server} refresh_error]} {
+    puts "SMOKE_HW_SERVER_REFRESH_WARNING $refresh_error"
+}
+after 2000
 
 set targets [get_hw_targets *]
 puts "SMOKE_HW_TARGET_COUNT [llength $targets]"

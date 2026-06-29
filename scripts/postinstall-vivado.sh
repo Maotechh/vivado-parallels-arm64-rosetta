@@ -2,6 +2,7 @@
 set -euo pipefail
 
 : "${VERSION:=}"
+: "${XILINX_ROOT:=$HOME/Xilinx}"
 : "${INSTALL_SYSTEM_SHIMS:=1}"
 
 if [ -z "${VIVADO_ROOT:-}" ]; then
@@ -9,7 +10,7 @@ if [ -z "${VIVADO_ROOT:-}" ]; then
     echo "Set VERSION or VIVADO_ROOT before running postinstall-vivado.sh directly." >&2
     exit 1
   fi
-  VIVADO_ROOT="$HOME/Xilinx/$VERSION/Vivado"
+  VIVADO_ROOT="$XILINX_ROOT/$VERSION/Vivado"
 fi
 
 if [ -z "$VERSION" ]; then
@@ -20,12 +21,27 @@ if [ -z "$VERSION" ]; then
 fi
 
 if [ ! -f "$VIVADO_ROOT/settings64.sh" ] || [ ! -x "$VIVADO_ROOT/bin/vivado" ]; then
+  alt_vivado_root="$XILINX_ROOT/Vivado/$VERSION"
+  if [ -f "$alt_vivado_root/settings64.sh" ] && [ -x "$alt_vivado_root/bin/vivado" ]; then
+    VIVADO_ROOT="$alt_vivado_root"
+  fi
+fi
+
+if [ ! -f "$VIVADO_ROOT/settings64.sh" ] || [ ! -x "$VIVADO_ROOT/bin/vivado" ]; then
   echo "Vivado installation was not found at: $VIVADO_ROOT" >&2
   echo "Set VIVADO_ROOT or pass --vivado-root." >&2
   exit 1
 fi
 
-mkdir -p "$HOME/.local/bin" "$HOME/.local/xilinx-x86_64-tools" "$HOME/.local/share/applications"
+mkdir -p "$HOME/.local/bin" "$HOME/.local/xilinx-x86_64-tools" "$HOME/.local/xilinx-x86_64-libs" "$HOME/.local/share/applications"
+
+if [ ! -e "$HOME/.local/xilinx-x86_64-libs/libtinfo.so.5" ]; then
+  if [ -e /usr/lib/x86_64-linux-gnu/libtinfo.so.5 ]; then
+    ln -s /usr/lib/x86_64-linux-gnu/libtinfo.so.5 "$HOME/.local/xilinx-x86_64-libs/libtinfo.so.5"
+  elif [ -e /usr/lib/x86_64-linux-gnu/libtinfo.so.6 ]; then
+    ln -s /usr/lib/x86_64-linux-gnu/libtinfo.so.6 "$HOME/.local/xilinx-x86_64-libs/libtinfo.so.5"
+  fi
+fi
 
 cat > "$HOME/.local/xilinx-x86_64-tools/gcc" <<'EOF'
 #!/usr/bin/env bash
@@ -35,7 +51,15 @@ cat > "$HOME/.local/xilinx-x86_64-tools/g++" <<'EOF'
 #!/usr/bin/env bash
 exec /usr/bin/x86_64-linux-gnu-g++ "$@"
 EOF
-chmod +x "$HOME/.local/xilinx-x86_64-tools/gcc" "$HOME/.local/xilinx-x86_64-tools/g++"
+cat > "$HOME/.local/xilinx-x86_64-tools/uname" <<'EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = "-m" ]; then
+  echo x86_64
+else
+  exec /usr/bin/uname "$@"
+fi
+EOF
+chmod +x "$HOME/.local/xilinx-x86_64-tools/gcc" "$HOME/.local/xilinx-x86_64-tools/g++" "$HOME/.local/xilinx-x86_64-tools/uname"
 
 cat > "$HOME/.local/bin/vivado" <<EOF
 #!/usr/bin/env bash
@@ -43,12 +67,15 @@ set -euo pipefail
 
 source "$VIVADO_ROOT/settings64.sh"
 export PATH="$HOME/.local/xilinx-x86_64-tools:\$PATH"
+export LD_LIBRARY_PATH="$HOME/.local/xilinx-x86_64-libs:\${LD_LIBRARY_PATH:-}"
 exec "$VIVADO_ROOT/bin/vivado" "\$@"
 EOF
 chmod +x "$HOME/.local/bin/vivado"
 
 icon="$VIVADO_ROOT/doc/images/vivado_logo.png"
-cat > "$HOME/.local/share/applications/vivado-$VERSION.desktop" <<EOF
+desktop_id="vivado-$VERSION.desktop"
+desktop_file="$HOME/.local/share/applications/$desktop_id"
+cat > "$desktop_file" <<EOF
 [Desktop Entry]
 Version=1.0
 Type=Application
@@ -58,11 +85,67 @@ Exec=$HOME/.local/bin/vivado
 Icon=$icon
 Terminal=false
 Categories=Development;Electronics;
+Keywords=Vivado;Xilinx;AMD;FPGA;Verilog;VHDL;Synthesis;
 StartupNotify=true
 EOF
 
 if command -v update-desktop-database >/dev/null 2>&1; then
   update-desktop-database "$HOME/.local/share/applications" >/dev/null 2>&1 || true
+fi
+
+if command -v python3 >/dev/null 2>&1 && command -v gsettings >/dev/null 2>&1; then
+  python3 - "$desktop_id" <<'PY' >/dev/null 2>&1 || true
+import sys
+
+try:
+    from gi.repository import Gio, GLib
+except Exception:
+    raise SystemExit(0)
+
+app_id = sys.argv[1]
+settings = Gio.Settings.new("org.gnome.shell")
+layout = settings.get_value("app-picker-layout").unpack()
+if not layout:
+    raise SystemExit(0)
+
+page = dict(layout[0])
+if app_id in page:
+    raise SystemExit(0)
+
+positions = []
+for value in page.values():
+    if isinstance(value, dict) and "position" in value:
+        positions.append(int(value["position"]))
+
+page[app_id] = {"position": (max(positions) + 1) if positions else 0}
+
+def scalar_variant(value):
+    if isinstance(value, bool):
+        return GLib.Variant("b", value)
+    if isinstance(value, int):
+        return GLib.Variant("i", value)
+    if isinstance(value, str):
+        return GLib.Variant("s", value)
+    return None
+
+def page_variant(raw_page):
+    converted = {}
+    for key, value in raw_page.items():
+        if not isinstance(value, dict):
+            continue
+        inner = {}
+        for inner_key, inner_value in value.items():
+            variant = scalar_variant(inner_value)
+            if variant is not None:
+                inner[inner_key] = variant
+        if inner:
+            converted[key] = GLib.Variant("a{sv}", inner)
+    return converted
+
+layout[0] = page
+settings.set_value("app-picker-layout", GLib.Variant("aa{sv}", [page_variant(p) for p in layout]))
+settings.sync()
+PY
 fi
 
 if [ "$INSTALL_SYSTEM_SHIMS" -eq 1 ]; then

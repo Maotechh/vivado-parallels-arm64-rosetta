@@ -17,9 +17,9 @@ AMD account login, export-control checks, license terms, and the installer downl
 
 ## Verified Result
 
-This repo is version-parameterized. The Rosetta/binfmt, x86_64 compiler shim, udev, and smoke-test workflow was tested on Ubuntu 24.04.4 ARM64 under Parallels Desktop with Vivado 2026.1. Run the included smoke tests after installing your target Vivado version to validate your machine.
+This repo is version-parameterized. The Rosetta/binfmt, x86_64 compiler shim, udev, and smoke-test workflow was tested on Ubuntu 24.04.4 ARM64 under Parallels Desktop with Vivado 2026.1 and 2023.2. Run the included smoke tests after installing your target Vivado version to validate your machine.
 
-- Vivado install root defaults to `~/Xilinx/<version>/Vivado`.
+- Vivado install root is auto-detected as either `~/Xilinx/<version>/Vivado` or `~/Xilinx/Vivado/<version>`, depending on the AMD installer release.
 - Vivado GUI launches through Rosetta.
 - BASIC license was detected by Vivado.
 - XSim behavioral simulation passed with `SMOKE_SIM_PASS`.
@@ -27,10 +27,10 @@ This repo is version-parameterized. The Rosetta/binfmt, x86_64 compiler shim, ud
 - Implementation and bitstream generation passed.
 - `clk_wiz` IP catalog, generation, and OOC synthesis passed.
 - Hardware Manager started `hw_server` and `cs_server`.
-- Digilent FTDI JTAG target was detected.
-- FPGA device was detected as `xc7a200t`.
-- A safe no-external-IO `xc7a200t` bitstream was generated and programmed.
-- Vivado reported `End of startup status: HIGH` after JTAG programming.
+- On the hardware-verified run, Digilent FTDI JTAG target detection passed.
+- On the hardware-verified run, FPGA device detection passed as `xc7a200t`.
+- On the hardware-verified run, a safe no-external-IO `xc7a200t` bitstream was generated and programmed.
+- On the hardware-verified run, Vivado reported `End of startup status: HIGH` after JTAG programming.
 
 ## What This Fixes
 
@@ -57,6 +57,8 @@ cd vivado-parallels-arm64-rosetta
 ./install.sh --version <version> --installer ~/Downloads/*<version>*Lin64*.bin --smoke
 ```
 
+The wrapper extracts the AMD `.bin` installer, makes `xsetup` see `uname -m` as `x86_64`, and then launches `xsetup` under Rosetta. This avoids the installer incorrectly rejecting ARM64 Ubuntu as a 32-bit platform.
+
 If Vivado is already installed:
 
 ```bash
@@ -68,6 +70,24 @@ If the board is plugged in and assigned to the VM:
 ```bash
 ./install.sh --version <version> --skip-installer --smoke --hardware-detect
 ```
+
+The postinstall step creates `~/.local/share/applications/vivado-<version>.desktop`, updates the desktop database, and appends it to GNOME's app picker layout when that setting already exists. If a macOS-style GNOME Launchpad extension still does not refresh, run `gtk-launch vivado-<version>` once or log out and back in.
+
+For a non-GUI batch install, generate an installer config with the same AMD release first, edit the selected modules, then run:
+
+```bash
+./scripts/generate-install-config.sh ~/Downloads/*<version>*Lin64*.bin install_config.txt
+```
+
+```bash
+./install.sh --version <version> \
+  --installer ~/Downloads/*<version>*Lin64*.bin \
+  --install-config install_config.txt \
+  --accept-eulas \
+  --smoke
+```
+
+`--accept-eulas` is intentionally explicit because it passes AMD `xsetup` the required `XilinxEULA,3rdPartyEULA` acceptance flag.
 
 To program a safe JTAG test bitstream:
 
@@ -83,7 +103,8 @@ Change `VIVADO_PART` and `HW_PART` for your FPGA. The test design has no externa
 - `scripts/check-env.sh`: checks ARM64 Linux and Rosetta binfmt.
 - `scripts/prepare-rosetta-binfmt.sh`: masks `qemu-x86_64` so Rosetta handles x86_64 ELF.
 - `scripts/install-deps.sh`: enables `amd64` architecture and installs runtime/cross-compiler packages.
-- `scripts/run-vivado-installer.sh`: launches the AMD installer you downloaded.
+- `scripts/generate-install-config.sh`: runs `xsetup -b ConfigGen` through the same `uname` shim for release-specific batch configs.
+- `scripts/run-vivado-installer.sh`: extracts the AMD installer, injects the ARM64-safe `uname` shim, and launches `xsetup` in GUI or batch mode.
 - `scripts/postinstall-vivado.sh`: creates the Vivado wrapper, desktop entry, compiler wrappers, and optional system compiler/linker shims.
 - `scripts/install-cable-udev.sh`: installs Xilinx cable udev rules and reloads udev.
 - `scripts/smoke-test.sh`: runs software, hardware-detect, or hardware-program smoke tests.
@@ -108,12 +129,25 @@ and masks QEMU's x86_64 handler with:
 
 This avoids Vivado and XSim running under QEMU when Rosetta is available.
 
+### Installer `uname -m` Check
+
+Some AMD `xsetup` scripts reject any host where `uname -m` is not `x86_64`, even when x86_64 binaries run correctly through Rosetta. The installer wrapper handles this by extracting the downloaded `.bin` with `--noexec --target`, putting a tiny `uname` shim first in `PATH`, and only overriding:
+
+```text
+uname -m -> x86_64
+```
+
+All other `uname` calls still go to `/usr/bin/uname`.
+
 ### XSim Compiler/Linker Shims
 
 The failure mode was XSim using ARM host compiler/linker components while elaborating an x86_64 simulator snapshot. The fix is:
 
 - Install `gcc-x86-64-linux-gnu`, `g++-x86-64-linux-gnu`, and `libc6-dev:amd64`.
+- Install x86_64 USB libraries used by `hw_server`, including `libusb` and `libftdi`.
 - Put x86_64 `gcc`/`g++` wrappers ahead of Vivado's PATH via `~/.local/bin/vivado`.
+- Put a `uname` shim ahead of Vivado's PATH so older launch scripts that require `uname -m == x86_64` run under Rosetta.
+- Add a local `libtinfo.so.5` compatibility link for older Vivado releases on Ubuntu versions that only ship `libtinfo.so.6`.
 - Optionally install system shims for `/usr/bin/gcc`, `/usr/bin/g++`, and `/usr/bin/ld`.
 
 The system shims are invasive but backed up automatically as:
@@ -146,7 +180,17 @@ The board was visible in `lsusb`, but Vivado initially found no hardware targets
 - `52-xilinx-ftdi-usb.rules`
 - `52-xilinx-pcusb.rules`
 
-If `hw_server` still finds no target after installing rules, unplug and replug the board USB cable, and verify the USB device is attached to the VM in Parallels.
+If `hw_server` still finds no target after installing rules, first verify the board is actually attached to the VM:
+
+```bash
+lsusb
+```
+
+Expected Digilent cables commonly show up as FTDI devices such as `0403:6014`. If `lsusb` does not show the Digilent device, attach it from Parallels Desktop's USB menu or unplug and replug the board USB cable. If `lsusb` shows the device but Vivado still reports no targets, check that `/dev/bus/usb/...` is writable by your user and rerun the udev install step:
+
+```bash
+./scripts/install-cable-udev.sh
+```
 
 ## Smoke Tests
 
@@ -196,7 +240,8 @@ SMOKE_ALL_PASS_HW_PROGRAM
 
 - This repo does not download Vivado or embed AMD credentials.
 - This repo does not redistribute AMD/Xilinx proprietary installers, device files, IP, or licenses.
-- The installer may still require interactive login and EULA/product selection.
+- The installer may still require AMD authentication, export-control checks, and product/module selection.
+- Batch install configs are release-specific; generate a fresh config for each AMD release instead of reusing an old one blindly.
 - Board-specific peripherals are not tested. The hardware program test only validates JTAG configuration.
 - The included software project targets `xc7a35tcpg236-1` as a small generic Vivado flow test. It is not meant to match your connected board.
 - The safe hardware-program test must use a `VIVADO_PART` compatible with your physical FPGA device.
@@ -209,7 +254,7 @@ The scripts and documentation in this repo are released under the MIT License. A
 
 These are the concrete actions that led to the verified setup:
 
-1. Installed Vivado under `~/Xilinx/<version>/Vivado`; the fully tested session used Vivado 2026.1.
+1. Installed Vivado under both supported layouts, depending on installer release: `~/Xilinx/<version>/Vivado` and `~/Xilinx/Vivado/<version>`.
 2. Confirmed the Vivado BASIC license was detected.
 3. Switched x86_64 execution from QEMU to Parallels Rosetta by masking `qemu-x86_64`.
 4. Installed `amd64` runtime libraries and x86_64 cross compilers.
@@ -217,12 +262,12 @@ These are the concrete actions that led to the verified setup:
 6. Added `~/.local/xilinx-x86_64-tools/gcc` and `g++`.
 7. Added system compiler/linker shims for XSim compatibility.
 8. Created a desktop entry for Vivado GUI.
-9. Ran GUI launch test successfully.
+9. Ran GUI launch tests successfully from the wrapper and the desktop entry.
 10. Ran simulation, synthesis, implementation, bitstream, and IP generation smoke tests.
 11. Installed Xilinx/Digilent udev rules for JTAG cable access.
-12. Detected the connected Digilent JTAG target and `xc7a200t` device.
-13. Generated a safe no-external-IO `xc7a200t` bitstream.
-14. Programmed the FPGA over JTAG successfully.
+12. Detected the connected Digilent JTAG target and `xc7a200t` device on the hardware-verified run.
+13. Generated a safe no-external-IO `xc7a200t` bitstream on the hardware-verified run.
+14. Programmed the FPGA over JTAG successfully on the hardware-verified run.
 
 ## Publish To GitHub
 
