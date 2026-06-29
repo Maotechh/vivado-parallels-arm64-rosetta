@@ -1,0 +1,10 @@
+.work/
+smoke/work/
+smoke/hw_program_work/
+*.log
+*.jou
+*.str
+*.pb
+clockInfo.txt
+.Xil/
+*.backup.*
