@@ -3,7 +3,7 @@ set -euo pipefail
 
 : "${INSTALLER:=}"
 : "${XILINX_ROOT:=$HOME/Xilinx}"
-: "${VIVADO_ROOT:=$XILINX_ROOT/2026.1/Vivado}"
+: "${VIVADO_ROOT:=$XILINX_ROOT/2023.1/Vivado}"
 
 if [ -z "$INSTALLER" ]; then
   cat >&2 <<EOF

@@ -9,7 +9,7 @@ Usage:
   ./install.sh [options]
 
 Options:
-  --version VERSION        Vivado version, default: 2026.1
+  --version VERSION        Vivado version, default: 2023.1
   --xilinx-root DIR        Xilinx install root, default: $HOME/Xilinx
   --vivado-root DIR        Vivado root, default: $XILINX_ROOT/$VERSION/Vivado
   --installer FILE         Already-downloaded AMD/Xilinx Linux Unified Installer
@@ -21,13 +21,13 @@ Options:
   --help                   Show this help
 
 Examples:
-  ./install.sh --installer ~/Downloads/FPGAs_AdaptiveSoCs_Unified_2026.1_*.bin --smoke
+  ./install.sh --installer ~/Downloads/FPGAs_AdaptiveSoCs_Unified_2023.1_*.bin --smoke
   ./install.sh --skip-installer --smoke --hardware-detect
   ./install.sh --postinstall-only --no-system-shims
 EOF
 }
 
-VERSION="${VERSION:-2026.1}"
+VERSION="${VERSION:-2023.1}"
 XILINX_ROOT="${XILINX_ROOT:-$HOME/Xilinx}"
 VIVADO_ROOT="${VIVADO_ROOT:-}"
 INSTALLER="${INSTALLER:-}"

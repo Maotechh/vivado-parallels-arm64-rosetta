@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${VERSION:=2026.1}"
+: "${VERSION:=2023.1}"
 : "${VIVADO_ROOT:=$HOME/Xilinx/$VERSION/Vivado}"
 
 rules_dir="$VIVADO_ROOT/data/xicom/cable_drivers/lin64/install_script/install_drivers"
