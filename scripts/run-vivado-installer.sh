@@ -10,7 +10,7 @@ if [ -z "$INSTALLER" ]; then
 No installer was provided.
 
 Download the Linux Unified Installer from AMD/Xilinx, then rerun:
-  ./install.sh --installer /path/to/FPGAs_AdaptiveSoCs_Unified_<version>.bin
+  ./install.sh --installer /path/to/*<version>*Lin64*.bin
 
 AMD login, export controls, and EULA acceptance cannot be automated or redistributed here.
 EOF

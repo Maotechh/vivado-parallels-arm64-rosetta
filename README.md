@@ -10,7 +10,7 @@ This repo documents and scripts a verified Vivado installation flow for:
 The goal is to make the repeatable part one-command:
 
 ```bash
-./install.sh --installer ~/Downloads/FPGAs_AdaptiveSoCs_Unified_2023.1_*.bin --smoke
+./install.sh --installer ~/Downloads/*2023.1*Lin64*.bin --smoke
 ```
 
 AMD account login, export-control checks, license terms, and the installer download cannot be redistributed or bypassed. Download the official Linux Unified Installer from AMD first, then run this repo's script.
@@ -54,7 +54,7 @@ This repo handles those points.
 ```bash
 git clone https://github.com/Maotechh/vivado-parallels-arm64-rosetta.git
 cd vivado-parallels-arm64-rosetta
-./install.sh --installer ~/Downloads/FPGAs_AdaptiveSoCs_Unified_2023.1_*.bin --smoke
+./install.sh --installer ~/Downloads/*2023.1*Lin64*.bin --smoke
 ```
 
 If Vivado is already installed:

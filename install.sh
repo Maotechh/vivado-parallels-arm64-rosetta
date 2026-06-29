@@ -21,7 +21,7 @@ Options:
   --help                   Show this help
 
 Examples:
-  ./install.sh --installer ~/Downloads/FPGAs_AdaptiveSoCs_Unified_2023.1_*.bin --smoke
+  ./install.sh --installer ~/Downloads/*2023.1*Lin64*.bin --smoke
   ./install.sh --skip-installer --smoke --hardware-detect
   ./install.sh --postinstall-only --no-system-shims
 EOF
