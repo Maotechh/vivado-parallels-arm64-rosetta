@@ -1,55 +1,43 @@
-# Vivado on Parallels ARM64 Linux with Rosetta
+# Vivado Parallels ARM64 Rosetta Installer
 
-This repo documents and scripts a verified Vivado installation flow for:
+[![CI](https://github.com/Maotechh/vivado-parallels-arm64-rosetta/actions/workflows/ci.yml/badge.svg)](https://github.com/Maotechh/vivado-parallels-arm64-rosetta/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-- Apple Silicon Mac
-- Parallels Desktop Ubuntu ARM64 VM
-- Rosetta Linux x86_64 emulation
-- AMD Vivado for Linux (x86_64)
+Install and post-configure AMD Vivado for Linux inside an Ubuntu ARM64 VM on Apple Silicon, using Parallels Desktop's Rosetta x86_64 emulation.
 
-The goal is to make the repeatable part one-command:
+Vivado's Linux release is x86_64-only. This project provides the glue needed for the installer, GUI, XSim, and JTAG tooling to work from an ARM64 Ubuntu guest without redistributing any AMD/Xilinx proprietary files.
 
-```bash
-./install.sh --version <version> --installer ~/Downloads/*<version>*Lin64*.bin --smoke
-```
+## Status
 
-AMD account login, export-control checks, license terms, and the installer download cannot be redistributed or bypassed. Download the official Linux Unified Installer from AMD first, then run this repo's script.
+This is an installer helper, not a Vivado mirror. You still need to download the official AMD/Xilinx Linux Unified Installer yourself and satisfy AMD account, export-control, license, and EULA requirements.
 
-## Verified Result
+Tested environment:
 
-This repo is version-parameterized. The Rosetta/binfmt, x86_64 compiler shim, udev, and smoke-test workflow was tested on Ubuntu 24.04.4 ARM64 under Parallels Desktop with Vivado 2026.1 and 2023.2. Run the included smoke tests after installing your target Vivado version to validate your machine.
+| Component | Tested |
+| --- | --- |
+| Host | Apple Silicon Mac |
+| VM | Parallels Desktop Ubuntu ARM64 |
+| Emulation | Parallels Rosetta for Linux |
+| Ubuntu | 24.04 ARM64 |
+| Vivado | Tested with Vivado 2026.1 and 2023.2 |
 
-- Vivado install root is auto-detected as either `~/Xilinx/<version>/Vivado` or `~/Xilinx/Vivado/<version>`, depending on the AMD installer release.
-- Vivado GUI launches through Rosetta.
-- BASIC license was detected by Vivado.
-- XSim behavioral simulation passed with `SMOKE_SIM_PASS`.
-- Project-mode synthesis passed with 0 errors.
-- Implementation and bitstream generation passed.
-- `clk_wiz` IP catalog, generation, and OOC synthesis passed.
-- Hardware Manager started `hw_server` and `cs_server`.
-- On the hardware-verified run, Digilent FTDI JTAG target detection passed.
-- On the hardware-verified run, FPGA device detection passed as `xc7a200t`.
-- On the hardware-verified run, a safe no-external-IO `xc7a200t` bitstream was generated and programmed.
-- On the hardware-verified run, Vivado reported `End of startup status: HIGH` after JTAG programming.
+## What It Handles
 
-## What This Fixes
-
-Vivado for Linux is x86_64-only. In an ARM64 Ubuntu VM, several things fail unless they are handled explicitly:
-
-- Linux must route x86_64 ELF binaries to Parallels Rosetta, not QEMU user emulation.
-- Ubuntu must have enough `amd64` runtime libraries for x86_64 Vivado binaries.
-- XSim invokes host compiler/linker tools; on ARM64 it can accidentally call ARM `gcc`/`ld`, which breaks x86_64 simulation elaboration.
-- JTAG cable access needs Xilinx/Digilent udev rules, otherwise `hw_server` can connect but find no targets.
-
-This repo handles those points.
+- Routes x86_64 ELF execution to Parallels Rosetta instead of QEMU user emulation.
+- Works around AMD `xsetup` and Vivado launcher `uname -m` checks on ARM64.
+- Installs required `amd64` runtime libraries, compiler toolchains, USB libraries, and GTK dependencies.
+- Creates a stable `~/.local/bin/vivado` wrapper for CLI and GUI use.
+- Adds XSim compiler/linker shims so x86_64 simulator elaboration does not accidentally use ARM64 host tools.
+- Installs Xilinx/Digilent cable udev rules for JTAG.
+- Provides software and optional hardware smoke tests.
 
 ## Quick Start
 
 1. Enable Rosetta for Linux in Parallels Desktop and install Parallels Tools.
 
-2. Download the AMD/Xilinx Linux Unified Installer.
+2. Download the AMD/Xilinx Linux Unified Installer, for example a `*Lin64*.bin` file, from AMD.
 
-3. Run:
+3. Install and run the software smoke test:
 
 ```bash
 git clone https://github.com/Maotechh/vivado-parallels-arm64-rosetta.git
@@ -57,29 +45,16 @@ cd vivado-parallels-arm64-rosetta
 ./install.sh --version <version> --installer ~/Downloads/*<version>*Lin64*.bin --smoke
 ```
 
-The wrapper extracts the AMD `.bin` installer, makes `xsetup` see `uname -m` as `x86_64`, and then launches `xsetup` under Rosetta. This avoids the installer incorrectly rejecting ARM64 Ubuntu as a 32-bit platform.
-
 If Vivado is already installed:
 
 ```bash
 ./install.sh --version <version> --skip-installer --smoke
 ```
 
-If the board is plugged in and assigned to the VM:
-
-```bash
-./install.sh --version <version> --skip-installer --smoke --hardware-detect
-```
-
-The postinstall step creates `~/.local/share/applications/vivado-<version>.desktop`, updates the desktop database, and appends it to GNOME's app picker layout when that setting already exists. If a macOS-style GNOME Launchpad extension still does not refresh, run `gtk-launch vivado-<version>` once or log out and back in.
-
-For a non-GUI batch install, generate an installer config with the same AMD release first, edit the selected modules, then run:
+For a batch install:
 
 ```bash
 ./scripts/generate-install-config.sh ~/Downloads/*<version>*Lin64*.bin install_config.txt
-```
-
-```bash
 ./install.sh --version <version> \
   --installer ~/Downloads/*<version>*Lin64*.bin \
   --install-config install_config.txt \
@@ -87,124 +62,15 @@ For a non-GUI batch install, generate an installer config with the same AMD rele
   --smoke
 ```
 
-`--accept-eulas` is intentionally explicit because it passes AMD `xsetup` the required `XilinxEULA,3rdPartyEULA` acceptance flag.
+## Verify
 
-To program a safe JTAG test bitstream:
-
-```bash
-VIVADO_PART=xc7a200tsbg484-1 HW_PART=xc7a200t ./scripts/smoke-test.sh --hardware-program
-```
-
-Change `VIVADO_PART` and `HW_PART` for your FPGA. The test design has no external IO pins and only uses a tiny internal heartbeat register driven from `STARTUPE2.CFGMCLK`.
-
-## Scripts
-
-- `install.sh`: main entry point.
-- `scripts/check-env.sh`: checks ARM64 Linux and Rosetta binfmt.
-- `scripts/prepare-rosetta-binfmt.sh`: masks `qemu-x86_64` so Rosetta handles x86_64 ELF.
-- `scripts/install-deps.sh`: enables `amd64` architecture and installs runtime/cross-compiler packages.
-- `scripts/generate-install-config.sh`: runs `xsetup -b ConfigGen` through the same `uname` shim for release-specific batch configs.
-- `scripts/run-vivado-installer.sh`: extracts the AMD installer, injects the ARM64-safe `uname` shim, and launches `xsetup` in GUI or batch mode.
-- `scripts/postinstall-vivado.sh`: creates the Vivado wrapper, desktop entry, compiler wrappers, and optional system compiler/linker shims.
-- `scripts/install-cable-udev.sh`: installs Xilinx cable udev rules and reloads udev.
-- `scripts/smoke-test.sh`: runs software, hardware-detect, or hardware-program smoke tests.
-- `scripts/restore-system-shims.sh`: restores `/usr/bin/gcc`, `/usr/bin/g++`, and `/usr/bin/ld` if system shims were installed.
-
-## Important Design Choices
-
-### Rosetta Must Win Over QEMU
-
-The working setup has:
-
-```text
-/proc/sys/fs/binfmt_misc/RosettaLinux
-interpreter /media/psf/RosettaLinux/rosetta
-```
-
-and masks QEMU's x86_64 handler with:
-
-```text
-/etc/binfmt.d/qemu-x86_64.conf -> /dev/null
-```
-
-This avoids Vivado and XSim running under QEMU when Rosetta is available.
-
-### Installer `uname -m` Check
-
-Some AMD `xsetup` scripts reject any host where `uname -m` is not `x86_64`, even when x86_64 binaries run correctly through Rosetta. The installer wrapper handles this by extracting the downloaded `.bin` with `--noexec --target`, putting a tiny `uname` shim first in `PATH`, and only overriding:
-
-```text
-uname -m -> x86_64
-```
-
-All other `uname` calls still go to `/usr/bin/uname`.
-
-### Desktop Launch Quirk
-
-GNOME/GIO desktop launch can inject `GIO_LAUNCHED_DESKTOP_FILE` and `GIO_LAUNCHED_DESKTOP_FILE_PID`. In this ARM64/Rosetta setup, Vivado GUI could launch from a terminal but crash when started through a `.desktop` entry until those variables were cleared. The generated `~/.local/bin/vivado` wrapper unsets them before executing Vivado.
-
-### XSim Compiler/Linker Shims
-
-The failure mode was XSim using ARM host compiler/linker components while elaborating an x86_64 simulator snapshot. The fix is:
-
-- Install `gcc-x86-64-linux-gnu`, `g++-x86-64-linux-gnu`, and `libc6-dev:amd64`.
-- Install x86_64 USB libraries used by `hw_server`, including `libusb` and `libftdi`.
-- Put x86_64 `gcc`/`g++` wrappers ahead of Vivado's PATH via `~/.local/bin/vivado`.
-- Put a `uname` shim ahead of Vivado's PATH so older launch scripts that require `uname -m == x86_64` run under Rosetta.
-- Add a local `libtinfo.so.5` compatibility link for older Vivado releases on Ubuntu versions that only ship `libtinfo.so.6`.
-- Optionally install system shims for `/usr/bin/gcc`, `/usr/bin/g++`, and `/usr/bin/ld`.
-
-The system shims are invasive but backed up automatically as:
-
-```text
-/usr/bin/gcc.vivado-arm64-rosetta-backup
-/usr/bin/g++.vivado-arm64-rosetta-backup
-/usr/bin/ld.vivado-arm64-rosetta-backup
-```
-
-Restore them with:
-
-```bash
-./scripts/restore-system-shims.sh
-```
-
-If you do not want system shims:
-
-```bash
-./install.sh --skip-installer --no-system-shims
-```
-
-Be aware that XSim may fail on some Vivado versions without the system shims.
-
-### JTAG USB Rules
-
-The board was visible in `lsusb`, but Vivado initially found no hardware targets because `/dev/bus/usb/...` was not writable by the user. Installing these Vivado-provided udev rules fixed it:
-
-- `52-xilinx-digilent-usb.rules`
-- `52-xilinx-ftdi-usb.rules`
-- `52-xilinx-pcusb.rules`
-
-If `hw_server` still finds no target after installing rules, first verify the board is actually attached to the VM:
-
-```bash
-lsusb
-```
-
-Expected Digilent cables commonly show up as FTDI devices such as `0403:6014`. If `lsusb` does not show the Digilent device, attach it from Parallels Desktop's USB menu or unplug and replug the board USB cable. If `lsusb` shows the device but Vivado still reports no targets, check that `/dev/bus/usb/...` is writable by your user and rerun the udev install step:
-
-```bash
-./scripts/install-cable-udev.sh
-```
-
-## Smoke Tests
-
-Software test:
+Software smoke test:
 
 ```bash
 ./scripts/smoke-test.sh --software
 ```
 
-Expected markers:
+Expected markers include:
 
 ```text
 SMOKE_SIM_PASS
@@ -214,72 +80,44 @@ SMOKE_STEP_PASS ip_create_generate
 SMOKE_ALL_PASS
 ```
 
-Hardware detection:
+Hardware detection, after assigning the board USB/JTAG cable to the VM:
 
 ```bash
 ./scripts/smoke-test.sh --hardware-detect
 ```
 
-Expected markers:
-
-```text
-SMOKE_HW_TARGET_COUNT 1
-SMOKE_HW_DEVICE_COUNT 1
-SMOKE_ALL_PASS_HW_DETECT
-```
-
-Hardware programming:
+Safe JTAG programming test:
 
 ```bash
 VIVADO_PART=xc7a200tsbg484-1 HW_PART=xc7a200t ./scripts/smoke-test.sh --hardware-program
 ```
 
-Expected marker:
+Change `VIVADO_PART` and `HW_PART` for your FPGA. The programming smoke test generates a no-external-IO bitstream using `STARTUPE2.CFGMCLK`.
+
+## Documentation
+
+- [Installation Guide](docs/installation.md)
+- [How It Works](docs/how-it-works.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [Verification Notes](docs/verification.md)
+
+## Repository Layout
 
 ```text
-SMOKE_ALL_PASS_HW_PROGRAM
+install.sh                    Main install/postinstall entry point
+scripts/                      Installer, dependency, udev, validation, and recovery scripts
+smoke/src/                    Tiny Verilog designs used by smoke tests
+smoke/tcl/                    Vivado Tcl smoke-test flows
+docs/                         User and maintainer documentation
 ```
 
-## Limitations
+## Safety Notes
 
-- This repo does not download Vivado or embed AMD credentials.
-- This repo does not redistribute AMD/Xilinx proprietary installers, device files, IP, or licenses.
-- The installer may still require AMD authentication, export-control checks, and product/module selection.
-- Batch install configs are release-specific; generate a fresh config for each AMD release instead of reusing an old one blindly.
-- Board-specific peripherals are not tested. The hardware program test only validates JTAG configuration.
-- The included software project targets `xc7a35tcpg236-1` as a small generic Vivado flow test. It is not meant to match your connected board.
-- The safe hardware-program test must use a `VIVADO_PART` compatible with your physical FPGA device.
+- The scripts do not download Vivado or embed AMD credentials.
+- The scripts do not redistribute AMD/Xilinx proprietary installers, device files, IP, or licenses.
+- System compiler/linker shims are optional but enabled by default because some XSim flows need them. Restore backups with `./scripts/restore-system-shims.sh`.
+- Hardware behavior depends on Parallels USB assignment. If `lsusb` does not show the JTAG cable inside Ubuntu, Vivado cannot see it.
 
 ## License
 
-The scripts and documentation in this repo are released under the MIT License. AMD/Xilinx Vivado and related files remain subject to AMD/Xilinx terms.
-
-## Session Worklog
-
-These are the concrete actions that led to the verified setup:
-
-1. Installed Vivado under both supported layouts, depending on installer release: `~/Xilinx/<version>/Vivado` and `~/Xilinx/Vivado/<version>`.
-2. Confirmed the Vivado BASIC license was detected.
-3. Switched x86_64 execution from QEMU to Parallels Rosetta by masking `qemu-x86_64`.
-4. Installed `amd64` runtime libraries and x86_64 cross compilers.
-5. Created `~/.local/bin/vivado`, which sources `settings64.sh` and prepends x86_64 compiler wrappers.
-6. Added `~/.local/xilinx-x86_64-tools/gcc` and `g++`.
-7. Added system compiler/linker shims for XSim compatibility.
-8. Created a desktop entry for Vivado GUI.
-9. Ran GUI launch tests successfully from the wrapper and the desktop entry.
-10. Ran simulation, synthesis, implementation, bitstream, and IP generation smoke tests.
-11. Installed Xilinx/Digilent udev rules for JTAG cable access.
-12. Detected the connected Digilent JTAG target and `xc7a200t` device on the hardware-verified run.
-13. Generated a safe no-external-IO `xc7a200t` bitstream on the hardware-verified run.
-14. Programmed the FPGA over JTAG successfully on the hardware-verified run.
-
-## Publish To GitHub
-
-```bash
-git init
-git add .
-git commit -m "Add Vivado Parallels ARM64 Rosetta installer"
-git branch -M main
-git remote add origin git@github.com:Maotechh/vivado-parallels-arm64-rosetta.git
-git push -u origin main
-```
+The scripts and documentation in this repository are released under the MIT License. AMD/Xilinx Vivado and related files remain subject to AMD/Xilinx terms.

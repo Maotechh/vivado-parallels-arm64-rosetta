@@ -1,0 +1,55 @@
+name: Bug report
+description: Report an installation, launch, simulation, or hardware detection problem
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What failed?
+    validations:
+      required: true
+  - type: input
+    id: ubuntu
+    attributes:
+      label: Ubuntu version
+      placeholder: "24.04 ARM64"
+    validations:
+      required: true
+  - type: input
+    id: parallels
+    attributes:
+      label: Parallels Desktop version
+    validations:
+      required: false
+  - type: input
+    id: vivado
+    attributes:
+      label: Vivado version
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command
+      description: The exact command you ran.
+      render: bash
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Relevant output
+      description: Remove credentials, license data, and proprietary paths if needed.
+      render: text
+    validations:
+      required: false
+  - type: textarea
+    id: usb
+    attributes:
+      label: USB/JTAG details
+      description: For hardware issues, include `lsusb` and board/cable details.
+      render: text
+    validations:
+      required: false

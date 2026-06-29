@@ -1,3 +1,19 @@
+.DS_Store
+.env
+pwd
+pwd.*
+*.key
+*.pem
+*.license
+*.lic
+
+# AMD/Xilinx installers and generated install configs.
+*.bin
+install_config*.txt
+xsetup.log
+xinstall/
+
+# Vivado generated files and work directories.
 .work/
 smoke/work/
 smoke/hw_program_work/
@@ -8,3 +24,9 @@ smoke/hw_program_work/
 clockInfo.txt
 .Xil/
 *.backup.*
+
+# Local editor state.
+.idea/
+.vscode/
+*.swp
+*.swo
