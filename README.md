@@ -52,7 +52,7 @@ This repo handles those points.
 3. Run:
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/Maotechh/vivado-parallels-arm64-rosetta.git
 cd vivado-parallels-arm64-rosetta
 ./install.sh --installer ~/Downloads/FPGAs_AdaptiveSoCs_Unified_2026.1_*.bin --smoke
 ```
@@ -195,10 +195,15 @@ SMOKE_ALL_PASS_HW_PROGRAM
 ## Limitations
 
 - This repo does not download Vivado or embed AMD credentials.
+- This repo does not redistribute AMD/Xilinx proprietary installers, device files, IP, or licenses.
 - The installer may still require interactive login and EULA/product selection.
 - Board-specific peripherals are not tested. The hardware program test only validates JTAG configuration.
 - The included software project targets `xc7a35tcpg236-1` as a small generic Vivado flow test. It is not meant to match your connected board.
 - The safe hardware-program test must use a `VIVADO_PART` compatible with your physical FPGA device.
+
+## License
+
+The scripts and documentation in this repo are released under the MIT License. AMD/Xilinx Vivado and related files remain subject to AMD/Xilinx terms.
 
 ## Session Worklog
 
@@ -226,6 +231,6 @@ git init
 git add .
 git commit -m "Add Vivado Parallels ARM64 Rosetta installer"
 git branch -M main
-git remote add origin git@github.com:<user>/<repo>.git
+git remote add origin git@github.com:Maotechh/vivado-parallels-arm64-rosetta.git
 git push -u origin main
 ```
